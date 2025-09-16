@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 namespace App\Http\Controllers;
 
@@ -44,11 +44,58 @@ abstract class CRUDController extends Controller
         return $this->getEagerLoadRelations();
     }
 
-    public function index()
+    public function index(Request $request)
     {
         $relations = $this->getIndexEagerLoadRelations();
-        $items = $this->repository->all($relations);
-        return $this->resourceClass::collection($items);
+
+        // Verificar si se solicita paginación
+        if ($request->boolean('paginate', false)) {
+            $perPage = $request->integer('perPage', 15); // Default 15 items por página
+            $page = $request->integer('page', 1);
+
+            // Validar perPage (mínimo 1, máximo 100)
+            $perPage = max(1, min(100, $perPage));
+
+            $items = $this->repository->paginateWithFilters($request, $perPage, $relations);
+
+            return $this->resourceClass::collection($items)->additional([
+                'pagination' => [
+                    'current_page' => $items->currentPage(),
+                    'last_page' => $items->lastPage(),
+                    'per_page' => $items->perPage(),
+                    'total' => $items->total(),
+                    'from' => $items->firstItem(),
+                    'to' => $items->lastItem(),
+                    'has_more_pages' => $items->hasMorePages(),
+                    'prev_page_url' => $items->previousPageUrl(),
+                    'next_page_url' => $items->nextPageUrl(),
+                    'path' => $items->path(),
+                ],
+                'meta' => [
+                    'paginated' => true,
+                    'per_page_requested' => $request->integer('perPage', 15),
+                    'page_requested' => $page,
+                    'total_pages' => $items->lastPage(),
+                ],
+                'request_info' => [
+                    'url' => $request->url(),
+                    'query_params' => $request->query(),
+                ]
+            ]);
+        }
+
+        // Sin paginación, retornar todos los elementos
+        $items = $this->repository->allWithFilters($request, $relations);
+        return $this->resourceClass::collection($items)->additional([
+            'meta' => [
+                'paginated' => false,
+                'total_items' => $items->count(),
+            ],
+            'request_info' => [
+                'url' => $request->url(),
+                'query_params' => $request->query(),
+            ]
+        ]);
     }
 
     public function show($id)

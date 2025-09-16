@@ -7,6 +7,30 @@ use Illuminate\Database\Eloquent\Model;
 class MenuCategory extends Model
 {
     /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
+    protected $fillable = [
+        'company_id',
+        'name',
+        'description',
+        'is_active',
+        'sort_order',
+        'image_url',
+    ];
+
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'is_active' => 'boolean',
+        'sort_order' => 'integer',
+    ];
+
+    /**
      * La compañía a la que pertenece la categoría.
      */
     public function company()

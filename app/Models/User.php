@@ -16,22 +16,62 @@ class User extends Authenticatable
     /**
      * The attributes that are mass assignable.
      *
-     * @var list<string>
+     * @var array<int, string>
      */
     protected $fillable = [
         'name',
         'email',
         'password',
+        'display_name',
+        'phone',
+        'address',
+        'birth_date',
+        'avatar_url',
+        'bio',
+        'is_active',
+        'preferred_language',
+        'timezone',
+        'preferred_currency',
+        'email_notifications',
+        'push_notifications',
+        'sms_notifications',
+        'profile_public',
+        'show_activity',
+        'preferences',
+        'last_login_at',
+        'login_count',
+        'last_activity_at',
     ];
 
     /**
      * The attributes that should be hidden for serialization.
      *
-     * @var list<string>
+     * @var array<int, string>
      */
     protected $hidden = [
         'password',
         'remember_token',
+    ];
+
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'password' => 'hashed',
+        'birth_date' => 'date',
+        'is_active' => 'boolean',
+        'email_notifications' => 'boolean',
+        'push_notifications' => 'boolean',
+        'sms_notifications' => 'boolean',
+        'profile_public' => 'boolean',
+        'show_activity' => 'boolean',
+        'preferences' => 'array',
+        'last_login_at' => 'datetime',
+        'login_count' => 'integer',
+        'last_activity_at' => 'datetime',
     ];
 
     /**

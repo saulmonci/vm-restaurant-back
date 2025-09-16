@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 namespace App\Http\Controllers;
 
@@ -23,12 +23,18 @@ class MenuItemController extends CRUDController
     }
 
     /**
-     * Relaciones específicas para el método show
+     * Relaciones específicas para el método index (lista)
+     */
+    protected function getIndexEagerLoadRelations(): array
+    {
+        return ['category.company']; // Cargar categoría y empresa
+    }
+
+    /**
+     * Relaciones específicas para el método show (detalle)
      */
     protected function getShowEagerLoadRelations(): array
     {
-        return ['category', 'category.company']; // Más detalle incluyendo company
+        return ['category.company']; // Cargar categoría y empresa para detalle
     }
-
-    // Puedes sobreescribir métodos aquí si necesitas lógica extra
 }
