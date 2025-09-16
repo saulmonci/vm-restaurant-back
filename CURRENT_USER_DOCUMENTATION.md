@@ -7,18 +7,20 @@
 ## ✨ **Características Principales**
 
 ### 🚀 **Performance Optimizado**
-- ✅ **Singleton con cache** - Una sola instancia por request
-- ✅ **Cache de 1 hora** - Evita consultas repetidas a la DB
-- ✅ **Lazy loading** - Solo carga datos cuando se necesitan
-- ✅ **Auto-inicialización** - Se configura automáticamente
+
+-   ✅ **Singleton con cache** - Una sola instancia por request
+-   ✅ **Cache de 1 hora** - Evita consultas repetidas a la DB
+-   ✅ **Lazy loading** - Solo carga datos cuando se necesitan
+-   ✅ **Auto-inicialización** - Se configura automáticamente
 
 ### 🛠️ **API Completa**
-- ✅ **Información básica** - ID, nombre, email
-- ✅ **Configuraciones** - Timezone, idioma, moneda
-- ✅ **Preferencias** - Configuraciones personalizadas del usuario
-- ✅ **Roles y permisos** - Verificación de admin, roles
-- ✅ **Multi-tenancy** - Integración con companies
-- ✅ **Gestión de cache** - Limpieza y refresh manual
+
+-   ✅ **Información básica** - ID, nombre, email
+-   ✅ **Configuraciones** - Timezone, idioma, moneda
+-   ✅ **Preferencias** - Configuraciones personalizadas del usuario
+-   ✅ **Roles y permisos** - Verificación de admin, roles
+-   ✅ **Multi-tenancy** - Integración con companies
+-   ✅ **Gestión de cache** - Limpieza y refresh manual
 
 ## 📖 **Guía de Uso**
 
@@ -85,7 +87,7 @@ public function adminOnlyAction() {
     if (!CurrentUser::isAdmin()) {
         return response()->json(['error' => 'Admin access required'], 403);
     }
-    
+
     // Lógica de admin...
 }
 ```
@@ -127,9 +129,9 @@ CurrentUser::initialize();
 ### **En Controllers**
 
 ```php
-class UserController extends Controller 
+class UserController extends Controller
 {
-    public function profile() 
+    public function profile()
     {
         return response()->json([
             'user' => [
@@ -142,17 +144,17 @@ class UserController extends Controller
             ]
         ]);
     }
-    
+
     public function updateProfile(Request $request)
     {
         // Actualizar preferencias
         if ($request->has('preferences')) {
             CurrentUser::updatePreferences($request->preferences);
         }
-        
+
         // Refrescar cache
         CurrentUser::refresh();
-        
+
         return response()->json(['success' => true]);
     }
 }
@@ -169,7 +171,7 @@ class AdminMiddleware
             return redirect()->route('dashboard')
                 ->with('error', 'Admin access required');
         }
-        
+
         return $next($request);
     }
 }
@@ -200,7 +202,7 @@ class AuditableRepository extends BaseRepository
         if (!isset($data['created_by']) && CurrentUser::exists()) {
             $data['created_by'] = CurrentUser::id();
         }
-        
+
         return parent::create($data);
     }
 }
@@ -209,42 +211,47 @@ class AuditableRepository extends BaseRepository
 ## 📋 **Métodos Disponibles**
 
 ### **Información del Usuario**
-| Método | Retorno | Descripción |
-|--------|---------|-------------|
-| `CurrentUser::id()` | `int\|null` | ID del usuario autenticado |
-| `CurrentUser::get()` | `User\|null` | Instancia completa del usuario |
-| `CurrentUser::name()` | `string\|null` | Nombre para mostrar |
-| `CurrentUser::email()` | `string\|null` | Email del usuario |
+
+| Método                 | Retorno        | Descripción                    |
+| ---------------------- | -------------- | ------------------------------ |
+| `CurrentUser::id()`    | `int\|null`    | ID del usuario autenticado     |
+| `CurrentUser::get()`   | `User\|null`   | Instancia completa del usuario |
+| `CurrentUser::name()`  | `string\|null` | Nombre para mostrar            |
+| `CurrentUser::email()` | `string\|null` | Email del usuario              |
 
 ### **Verificaciones**
-| Método | Retorno | Descripción |
-|--------|---------|-------------|
-| `CurrentUser::exists()` | `bool` | Si hay usuario autenticado |
-| `CurrentUser::check()` | `bool` | Alias de exists() |
-| `CurrentUser::isAdmin()` | `bool` | Si el usuario es admin |
-| `CurrentUser::isActive()` | `bool` | Si el usuario está activo |
-| `CurrentUser::hasRole($role)` | `bool` | Si tiene un rol específico |
+
+| Método                        | Retorno | Descripción                |
+| ----------------------------- | ------- | -------------------------- |
+| `CurrentUser::exists()`       | `bool`  | Si hay usuario autenticado |
+| `CurrentUser::check()`        | `bool`  | Alias de exists()          |
+| `CurrentUser::isAdmin()`      | `bool`  | Si el usuario es admin     |
+| `CurrentUser::isActive()`     | `bool`  | Si el usuario está activo  |
+| `CurrentUser::hasRole($role)` | `bool`  | Si tiene un rol específico |
 
 ### **Configuraciones**
-| Método | Retorno | Descripción |
-|--------|---------|-------------|
-| `CurrentUser::timezone()` | `string` | Zona horaria del usuario |
-| `CurrentUser::language()` | `string` | Idioma preferido |
-| `CurrentUser::currency()` | `string` | Moneda preferida |
-| `CurrentUser::preferences($key, $default)` | `mixed` | Preferencias del usuario |
+
+| Método                                     | Retorno  | Descripción              |
+| ------------------------------------------ | -------- | ------------------------ |
+| `CurrentUser::timezone()`                  | `string` | Zona horaria del usuario |
+| `CurrentUser::language()`                  | `string` | Idioma preferido         |
+| `CurrentUser::currency()`                  | `string` | Moneda preferida         |
+| `CurrentUser::preferences($key, $default)` | `mixed`  | Preferencias del usuario |
 
 ### **Gestión**
-| Método | Retorno | Descripción |
-|--------|---------|-------------|
-| `CurrentUser::updatePreferences($prefs)` | `bool` | Actualizar preferencias |
-| `CurrentUser::updateLastActivity()` | `bool` | Actualizar última actividad |
-| `CurrentUser::companies()` | `Collection` | Companies del usuario |
-| `CurrentUser::clearCache()` | `void` | Limpiar cache |
-| `CurrentUser::refresh()` | `void` | Refrescar datos |
+
+| Método                                   | Retorno      | Descripción                 |
+| ---------------------------------------- | ------------ | --------------------------- |
+| `CurrentUser::updatePreferences($prefs)` | `bool`       | Actualizar preferencias     |
+| `CurrentUser::updateLastActivity()`      | `bool`       | Actualizar última actividad |
+| `CurrentUser::companies()`               | `Collection` | Companies del usuario       |
+| `CurrentUser::clearCache()`              | `void`       | Limpiar cache               |
+| `CurrentUser::refresh()`                 | `void`       | Refrescar datos             |
 
 ## 🔄 **Comparación con Auth::user()**
 
 ### **Antes (Laravel Auth):**
+
 ```php
 $user = Auth::user();              // Query DB cada vez
 $userId = Auth::id();              // Query DB cada vez
@@ -253,6 +260,7 @@ $isAdmin = Auth::user()?->role === 'admin'; // Query + logic
 ```
 
 ### **Después (CurrentUser):**
+
 ```php
 $user = CurrentUser::get();        // Desde cache ⚡
 $userId = CurrentUser::id();       // Desde cache ⚡
@@ -262,11 +270,11 @@ $isAdmin = CurrentUser::isAdmin(); // Desde cache + helper ⚡
 
 ## ⚡ **Beneficios de Performance**
 
-- **80-90% menos queries** de usuario por request
-- **Cache inteligente** de 1 hora con invalidación automática
-- **Lazy loading** - Solo carga cuando se usa
-- **Singleton pattern** - Una instancia por request
-- **Métodos helper** - Evita lógica repetitiva
+-   **80-90% menos queries** de usuario por request
+-   **Cache inteligente** de 1 hora con invalidación automática
+-   **Lazy loading** - Solo carga cuando se usa
+-   **Singleton pattern** - Una instancia por request
+-   **Métodos helper** - Evita lógica repetitiva
 
 ## 🎯 **Casos de Uso Comunes**
 

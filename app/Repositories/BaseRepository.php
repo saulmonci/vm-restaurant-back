@@ -95,13 +95,14 @@ abstract class BaseRepository implements BaseRepositoryInterface
         // Automatically add company_id if the model has company_id column and it's not already set
         $table = $this->model->getTable();
         $hasCompanyId = Schema::hasColumn($table, 'company_id');
-        
+
         if ($hasCompanyId && !isset($data['company_id']) && CurrentCompany::exists()) {
             $data['company_id'] = CurrentCompany::id();
         }
-        
+
         return $this->model->create($data);
-    }    public function update($id, array $data)
+    }
+    public function update($id, array $data)
     {
         $record = $this->find($id);
         if ($record) {
@@ -202,13 +203,14 @@ abstract class BaseRepository implements BaseRepositoryInterface
         // Check if the model has a company_id column
         $table = $this->model->getTable();
         $hasCompanyId = Schema::hasColumn($table, 'company_id');
-        
+
         if ($hasCompanyId && CurrentCompany::exists()) {
             $query->where('company_id', CurrentCompany::id());
         }
-        
+
         return $query;
-    }    /**
+    }
+    /**
      * Apply specific filters for each repository.
      * This method should be overridden by child repositories.
      */

@@ -21,20 +21,21 @@ class CompanyScopedMiddleware
         if (Auth::check()) {
             // Initialize CurrentCompany using Facade
             CurrentCompany::initialize();
-            
+
             $companyId = CurrentCompany::id();
-            
+
             if ($companyId) {
                 // Apply global scope to models that belong to companies
                 $this->applyCompanyScopes($companyId);
-                
+
                 // Store company ID in request for easy access
                 $request->merge(['current_company_id' => $companyId]);
             }
         }
 
         return $next($request);
-    }    /**
+    }
+    /**
      * Apply company scopes to relevant models
      */
     private function applyCompanyScopes($companyId)

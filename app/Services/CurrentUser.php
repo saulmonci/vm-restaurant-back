@@ -43,7 +43,7 @@ class CurrentUser
         if (!$this->loaded) {
             $this->initialize();
         }
-        
+
         return $this->userId;
     }
 
@@ -55,7 +55,7 @@ class CurrentUser
         if (!$this->loaded) {
             $this->initialize();
         }
-        
+
         return $this->user;
     }
 
@@ -83,11 +83,11 @@ class CurrentUser
         if (!$this->loaded) {
             $this->initialize();
         }
-        
+
         if ($key) {
             return data_get($this->preferences, $key, $default);
         }
-        
+
         return $this->preferences ?? $default;
     }
 
@@ -142,11 +142,11 @@ class CurrentUser
     public function hasRole(string $role): bool
     {
         $user = $this->get();
-        
+
         if (!$user) {
             return false;
         }
-        
+
         // This can be expanded based on your role system
         // For now, checking a simple 'role' attribute
         return $user->role === $role;
@@ -175,27 +175,27 @@ class CurrentUser
     public function updatePreferences(array $newPreferences): bool
     {
         $user = $this->get();
-        
+
         if (!$user) {
             return false;
         }
-        
+
         $currentPreferences = $user->preferences ?? [];
         $mergedPreferences = array_merge($currentPreferences, $newPreferences);
-        
+
         // Update in database
         $updated = $user->update(['preferences' => $mergedPreferences]);
-        
+
         if ($updated) {
             // Update cache
             $this->preferences = $mergedPreferences;
             $this->user->preferences = $mergedPreferences;
-            
+
             // Update cache storage
             $cacheKey = "user.{$user->id}";
             Cache::put($cacheKey, $user, 3600); // 1 hour
         }
-        
+
         return $updated;
     }
 
@@ -205,11 +205,11 @@ class CurrentUser
     public function updateLastActivity(): bool
     {
         $user = $this->get();
-        
+
         if (!$user) {
             return false;
         }
-        
+
         return $user->update([
             'last_activity_at' => now()
         ]);
@@ -221,11 +221,11 @@ class CurrentUser
     public function companies()
     {
         $user = $this->get();
-        
+
         if (!$user) {
             return collect([]);
         }
-        
+
         return $user->companies()->get();
     }
 
@@ -237,7 +237,7 @@ class CurrentUser
         if ($this->user) {
             Cache::forget("user.{$this->user->id}");
         }
-        
+
         $this->user = null;
         $this->userId = null;
         $this->preferences = null;
@@ -260,14 +260,14 @@ class CurrentUser
         if (!$this->userId) {
             return;
         }
-        
+
         $cacheKey = "user.{$this->userId}";
-        
+
         // Try to get from cache first
         $this->user = Cache::remember($cacheKey, 3600, function () {
             return User::find($this->userId);
         });
-        
+
         if ($this->user) {
             $this->preferences = $this->user->preferences ?? [];
         }
