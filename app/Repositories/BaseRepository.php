@@ -4,6 +4,8 @@ namespace App\Repositories;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
+use App\Facades\CurrentCompany;
 
 abstract class BaseRepository implements BaseRepositoryInterface
 {
@@ -16,23 +18,38 @@ abstract class BaseRepository implements BaseRepositoryInterface
 
     public function all(array $relations = [])
     {
-        if (empty($relations)) {
-            return $this->model->all();
+        $query = $this->model->newQuery();
+
+        // Apply company filter automatically if the model has company_id
+        $this->applyCompanyScope($query);
+
+        if (!empty($relations)) {
+            $query->with($relations);
         }
-        return $this->model->with($relations)->get();
+
+        return $query->get();
     }
 
     public function paginate(int $perPage = 15, array $relations = [])
     {
-        if (empty($relations)) {
-            return $this->model->paginate($perPage);
+        $query = $this->model->newQuery();
+
+        // Apply company filter automatically
+        $this->applyCompanyScope($query);
+
+        if (!empty($relations)) {
+            $query->with($relations);
         }
-        return $this->model->with($relations)->paginate($perPage);
+
+        return $query->paginate($perPage);
     }
 
     public function allWithFilters(Request $request, array $relations = [])
     {
         $query = $this->model->newQuery();
+
+        // Apply company filter automatically
+        $this->applyCompanyScope($query);
 
         if (!empty($relations)) {
             $query->with($relations);
@@ -47,6 +64,9 @@ abstract class BaseRepository implements BaseRepositoryInterface
     {
         $query = $this->model->newQuery();
 
+        // Apply company filter automatically
+        $this->applyCompanyScope($query);
+
         if (!empty($relations)) {
             $query->with($relations);
         }
@@ -58,18 +78,30 @@ abstract class BaseRepository implements BaseRepositoryInterface
 
     public function find($id, array $relations = [])
     {
-        if (empty($relations)) {
-            return $this->model->find($id);
+        $query = $this->model->newQuery();
+
+        // Apply company filter automatically
+        $this->applyCompanyScope($query);
+
+        if (!empty($relations)) {
+            $query->with($relations);
         }
-        return $this->model->with($relations)->find($id);
+
+        return $query->find($id);
     }
 
     public function create(array $data)
     {
+        // Automatically add company_id if the model has company_id column and it's not already set
+        $table = $this->model->getTable();
+        $hasCompanyId = Schema::hasColumn($table, 'company_id');
+        
+        if ($hasCompanyId && !isset($data['company_id']) && CurrentCompany::exists()) {
+            $data['company_id'] = CurrentCompany::id();
+        }
+        
         return $this->model->create($data);
-    }
-
-    public function update($id, array $data)
+    }    public function update($id, array $data)
     {
         $record = $this->find($id);
         if ($record) {
@@ -163,6 +195,20 @@ abstract class BaseRepository implements BaseRepositoryInterface
     }
 
     /**
+     * Apply company scope automatically if the model has company_id column
+     */
+    protected function applyCompanyScope($query)
+    {
+        // Check if the model has a company_id column
+        $table = $this->model->getTable();
+        $hasCompanyId = Schema::hasColumn($table, 'company_id');
+        
+        if ($hasCompanyId && CurrentCompany::exists()) {
+            $query->where('company_id', CurrentCompany::id());
+        }
+        
+        return $query;
+    }    /**
      * Apply specific filters for each repository.
      * This method should be overridden by child repositories.
      */

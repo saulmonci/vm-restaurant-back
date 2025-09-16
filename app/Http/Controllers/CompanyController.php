@@ -4,7 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Repositories\CompanyRepository;
 use App\Http\Resources\CompanyResource;
-use App\Services\CompanyContextService;
+use App\Facades\CurrentCompany;
+use App\Facades\CurrentUser;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
@@ -48,7 +49,7 @@ class CompanyController extends CRUDController
      */
     public function current(): JsonResponse
     {
-        $company = CompanyContextService::getCurrentCompany();
+        $company = CurrentCompany::get();
 
         if (!$company) {
             return response()->json(['error' => 'No company context found'], 404);
@@ -56,7 +57,7 @@ class CompanyController extends CRUDController
 
         return response()->json([
             'company' => new CompanyResource($company),
-            'settings' => CompanyContextService::getCompanySettings()
+            'settings' => CurrentCompany::settings()
         ]);
     }
 
@@ -65,8 +66,8 @@ class CompanyController extends CRUDController
      */
     public function userCompanies(): JsonResponse
     {
-        $companies = CompanyContextService::getUserCompanies();
-        $currentCompanyId = CompanyContextService::getCurrentCompanyId();
+        $companies = CurrentCompany::getUserCompanies();
+        $currentCompanyId = CurrentCompany::id();
 
         return response()->json([
             'companies' => CompanyResource::collection($companies),
@@ -83,7 +84,7 @@ class CompanyController extends CRUDController
             'company_id' => 'required|integer|exists:companies,id'
         ]);
 
-        $success = CompanyContextService::switchCompany($request->company_id);
+        $success = CurrentCompany::switchTo($request->company_id);
 
         if (!$success) {
             return response()->json([
@@ -91,7 +92,7 @@ class CompanyController extends CRUDController
             ], 403);
         }
 
-        $newCompany = CompanyContextService::getCurrentCompany();
+        $newCompany = CurrentCompany::get();
 
         return response()->json([
             'message' => 'Company switched successfully',
@@ -108,7 +109,7 @@ class CompanyController extends CRUDController
             'settings' => 'required|array'
         ]);
 
-        $success = CompanyContextService::updateCompanySettings($request->settings);
+        $success = CurrentCompany::updateSettings($request->settings);
 
         if (!$success) {
             return response()->json(['error' => 'Failed to update settings'], 500);
@@ -116,7 +117,7 @@ class CompanyController extends CRUDController
 
         return response()->json([
             'message' => 'Settings updated successfully',
-            'settings' => CompanyContextService::getCompanySettings()
+            'settings' => CurrentCompany::settings()
         ]);
     }
 
@@ -125,7 +126,7 @@ class CompanyController extends CRUDController
      */
     public function analytics(Request $request): JsonResponse
     {
-        $company = CompanyContextService::getCurrentCompany();
+        $company = CurrentCompany::get();
 
         if (!$company) {
             return response()->json(['error' => 'No company context found'], 404);
@@ -137,6 +138,12 @@ class CompanyController extends CRUDController
         $analytics = [
             'company_id' => $company->id,
             'period' => $period,
+            'user_info' => [
+                'user_id' => CurrentUser::id(),
+                'user_name' => CurrentUser::name(),
+                'user_timezone' => CurrentUser::timezone(),
+                'is_admin' => CurrentUser::isAdmin(),
+            ],
             'metrics' => [
                 'total_menu_items' => $company->menuCategories()->withCount('menuItems')->get()->sum('menu_items_count'),
                 'total_categories' => $company->menuCategories()->count(),
@@ -149,5 +156,62 @@ class CompanyController extends CRUDController
         ];
 
         return response()->json($analytics);
+    }
+
+    /**
+     * Get current user profile within company context
+     */
+    public function userProfile(): JsonResponse
+    {
+        if (!CurrentUser::check()) {
+            return response()->json(['error' => 'User not authenticated'], 401);
+        }
+
+        $profile = [
+            'user' => [
+                'id' => CurrentUser::id(),
+                'name' => CurrentUser::name(),
+                'email' => CurrentUser::email(),
+                'timezone' => CurrentUser::timezone(),
+                'language' => CurrentUser::language(),
+                'currency' => CurrentUser::currency(),
+                'is_admin' => CurrentUser::isAdmin(),
+                'is_active' => CurrentUser::isActive(),
+                'preferences' => CurrentUser::preferences(),
+            ],
+            'company' => [
+                'id' => CurrentCompany::id(),
+                'name' => CurrentCompany::get()?->name,
+                'settings' => CurrentCompany::settings(),
+            ],
+            'companies_access' => CurrentUser::companies()->count(),
+        ];
+
+        return response()->json($profile);
+    }
+
+    /**
+     * Update user preferences
+     */
+    public function updateUserPreferences(Request $request): JsonResponse
+    {
+        $request->validate([
+            'preferences' => 'required|array'
+        ]);
+
+        if (!CurrentUser::check()) {
+            return response()->json(['error' => 'User not authenticated'], 401);
+        }
+
+        $success = CurrentUser::updatePreferences($request->preferences);
+
+        if (!$success) {
+            return response()->json(['error' => 'Failed to update preferences'], 500);
+        }
+
+        return response()->json([
+            'message' => 'User preferences updated successfully',
+            'preferences' => CurrentUser::preferences()
+        ]);
     }
 }
