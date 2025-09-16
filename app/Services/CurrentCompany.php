@@ -30,7 +30,7 @@ class CurrentCompany
         }
 
         $this->companyId = $this->resolveCompanyId();
-        
+
         if ($this->companyId) {
             $this->loadCompanyData();
         }
@@ -46,7 +46,7 @@ class CurrentCompany
         if (!$this->loaded) {
             $this->initialize();
         }
-        
+
         return $this->companyId;
     }
 
@@ -58,7 +58,7 @@ class CurrentCompany
         if (!$this->loaded) {
             $this->initialize();
         }
-        
+
         return $this->company;
     }
 
@@ -70,11 +70,11 @@ class CurrentCompany
         if (!$this->loaded) {
             $this->initialize();
         }
-        
+
         if ($key) {
             return data_get($this->settings, $key, $default);
         }
-        
+
         return $this->settings ?? $default;
     }
 
@@ -94,15 +94,15 @@ class CurrentCompany
         if (!$this->userHasAccessToCompany(Auth::user(), $companyId)) {
             return false;
         }
-        
+
         // Clear current cache
         $this->clearCache();
-        
+
         // Set new company
         session(['current_company_id' => $companyId]);
         $this->companyId = $companyId;
         $this->loadCompanyData();
-        
+
         return true;
     }
 
@@ -112,27 +112,27 @@ class CurrentCompany
     public function updateSettings(array $newSettings): bool
     {
         $company = $this->get();
-        
+
         if (!$company) {
             return false;
         }
-        
+
         $currentSettings = $company->settings ?? [];
         $mergedSettings = array_merge($currentSettings, $newSettings);
-        
+
         // Update in database
         $updated = $company->update(['settings' => $mergedSettings]);
-        
+
         if ($updated) {
             // Update cache
             $this->settings = $mergedSettings;
             $this->company->settings = $mergedSettings;
-            
+
             // Update cache storage
             $cacheKey = "company.{$company->id}";
             Cache::put($cacheKey, $company, 3600); // 1 hour
         }
-        
+
         return $updated;
     }
 
@@ -141,12 +141,13 @@ class CurrentCompany
      */
     public function getUserCompanies()
     {
+        /** @var \App\Models\User|null $user */
         $user = Auth::user();
-        
+
         if (!$user) {
             return collect([]);
         }
-        
+
         // Get companies where the user is associated
         return $user->companies()->get();
     }
@@ -159,7 +160,7 @@ class CurrentCompany
         if ($this->company) {
             Cache::forget("company.{$this->company->id}");
         }
-        
+
         $this->company = null;
         $this->companyId = null;
         $this->settings = null;
@@ -174,32 +175,33 @@ class CurrentCompany
             return null;
         }
 
+        /** @var \App\Models\User $user */
         $user = Auth::user();
-        
+
         // Priority 1: User's direct company_id
         if (isset($user->company_id)) {
             return $user->company_id;
         }
-        
+
         // Priority 2: Session-stored company (for multi-company users)
         if (session()->has('current_company_id')) {
             $sessionCompanyId = session('current_company_id');
-            
+
             if ($this->userHasAccessToCompany($user, $sessionCompanyId)) {
                 return $sessionCompanyId;
             }
         }
-        
+
         // Priority 3: First company the user belongs to
         if ($user->companies()->exists()) {
             $firstCompany = $user->companies()->first();
-            
+
             // Store in session for future requests
             session(['current_company_id' => $firstCompany->id]);
-            
+
             return $firstCompany->id;
         }
-        
+
         return null;
     }
 
@@ -208,14 +210,14 @@ class CurrentCompany
         if (!$this->companyId) {
             return;
         }
-        
+
         $cacheKey = "company.{$this->companyId}";
-        
+
         // Try to get from cache first
         $this->company = Cache::remember($cacheKey, 3600, function () {
             return Company::find($this->companyId);
         });
-        
+
         if ($this->company) {
             $this->settings = $this->company->settings ?? [];
         }
@@ -227,8 +229,9 @@ class CurrentCompany
         if (isset($user->company_id) && $user->company_id == $companyId) {
             return true;
         }
-        
+
         // Access through CompanyUser relationship
-        return $user->companies()->where('company_id', $companyId)->exists();
+        /** @var \App\Models\User $user */
+        return $user->companies()->where('companies.id', $companyId)->exists();
     }
 }

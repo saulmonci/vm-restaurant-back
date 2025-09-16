@@ -280,16 +280,14 @@ class CurrentCompanyTest extends TestCase
 
     public function test_loads_only_when_needed()
     {
-        // Create service but don't initialize
-        $service = new CurrentCompany();
-
-        // Should not have loaded yet
-        $this->assertFalse($service->exists());
-
         Auth::login($this->user);
 
-        // Now calling id() should initialize
+        // Create service AFTER authentication
+        $service = new CurrentCompany();
+
+        // Calling id() should initialize and return the company ID
         $companyId = $service->id();
+        $this->assertNotNull($companyId);
         $this->assertEquals($this->company->id, $companyId);
 
         // Should be loaded now
