@@ -15,6 +15,8 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('address')->nullable();
+            $table->string('email')->nullable();
+            $table->string('phone')->nullable();
             $table->unsignedBigInteger('owner_id')->nullable();
             $table->timestamps();
             $table->foreign('owner_id')->references('id')->on('users')->onDelete('set null');

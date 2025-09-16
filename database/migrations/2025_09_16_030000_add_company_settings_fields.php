@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('companies', function (Blueprint $table) {
             // Company branding and customization
-            $table->string('logo_url')->nullable()->after('email');
+            $table->string('logo_url')->nullable()->after('phone');
             $table->string('website')->nullable()->after('logo_url');
 
             // Localization settings
