@@ -6,12 +6,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 use App\Models\Company;
+use App\Models\Role;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, HasApiTokens;
 
     /**
      * The attributes that are mass assignable.
@@ -93,5 +95,97 @@ class User extends Authenticatable
     public function companies()
     {
         return $this->belongsToMany(Company::class, 'company_users');
+    }
+
+    /**
+     * Los roles del usuario en las diferentes compañías.
+     */
+    public function roles()
+    {
+        return $this->belongsToMany(Role::class, 'user_roles')
+            ->withPivot('company_id')
+            ->withTimestamps();
+    }
+
+    /**
+     * Obtener roles del usuario en una compañía específica
+     */
+    public function rolesInCompany(int $companyId)
+    {
+        return $this->roles()->wherePivot('company_id', $companyId);
+    }
+
+    /**
+     * Verificar si el usuario tiene un rol específico en una compañía
+     */
+    public function hasRole(string $roleName, int $companyId): bool
+    {
+        return $this->rolesInCompany($companyId)
+            ->where('name', $roleName)
+            ->exists();
+    }
+
+    /**
+     * Verificar si el usuario tiene cualquiera de los roles especificados en una compañía
+     */
+    public function hasAnyRole(array $roleNames, int $companyId): bool
+    {
+        return $this->rolesInCompany($companyId)
+            ->whereIn('name', $roleNames)
+            ->exists();
+    }
+
+    /**
+     * Verificar si el usuario tiene un permiso específico en una compañía
+     */
+    public function hasPermission(string $permissionName, int $companyId): bool
+    {
+        $roles = $this->rolesInCompany($companyId)->with('permissions')->get();
+
+        foreach ($roles as $role) {
+            if ($role->permissions->contains('name', $permissionName)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Asignar un rol al usuario en una compañía específica
+     */
+    public function assignRole(string $roleName, int $companyId): bool
+    {
+        $role = Role::where('name', $roleName)->first();
+
+        if (!$role) {
+            return false;
+        }
+
+        // Verificar si ya tiene el rol en esa compañía
+        if ($this->hasRole($roleName, $companyId)) {
+            return true;
+        }
+
+        $this->roles()->attach($role->id, ['company_id' => $companyId]);
+
+        return true;
+    }
+
+    /**
+     * Remover un rol del usuario en una compañía específica
+     */
+    public function removeRole(string $roleName, int $companyId): bool
+    {
+        $role = Role::where('name', $roleName)->first();
+
+        if (!$role) {
+            return false;
+        }
+
+        $this->roles()->wherePivot('company_id', $companyId)
+            ->detach($role->id);
+
+        return true;
     }
 }

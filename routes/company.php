@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\MenuItemController;
 use App\Http\Controllers\MenuCategoryController;
+use App\Http\Controllers\RoleController;
 
 /*
 |--------------------------------------------------------------------------
@@ -23,6 +24,23 @@ Route::middleware(['auth:sanctum', 'company.scoped'])->group(function () {
         Route::post('/switch', [CompanyController::class, 'switchCompany']);
         Route::put('/settings', [CompanyController::class, 'updateSettings']);
         Route::get('/analytics', [CompanyController::class, 'analytics']);
+    });
+
+    // Role Management Routes (require admin permission)
+    Route::prefix('roles')->middleware('permission:manage_roles')->group(function () {
+        Route::get('/', [RoleController::class, 'index']);
+        Route::post('/', [RoleController::class, 'store']);
+        Route::get('/{role}', [RoleController::class, 'show']);
+        Route::put('/{role}', [RoleController::class, 'update']);
+        Route::delete('/{role}', [RoleController::class, 'destroy']);
+
+        // User role assignment
+        Route::post('/assign', [RoleController::class, 'assignToUser']);
+        Route::post('/remove', [RoleController::class, 'removeFromUser']);
+        Route::get('/users/with-roles', [RoleController::class, 'usersWithRoles']);
+
+        // Available permissions
+        Route::get('/permissions/all', [RoleController::class, 'permissions']);
     });
 
     // Standard CRUD routes - all automatically scoped to current company

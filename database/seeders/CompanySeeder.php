@@ -15,7 +15,6 @@ class CompanySeeder extends Seeder
         \App\Models\Company::create([
             'name' => 'Compañía de Prueba',
             'address' => 'Calle Falsa 123',
-            'owner_id' => 1, // Asumiendo que el usuario de prueba tiene id 1
         ]);
     }
 }

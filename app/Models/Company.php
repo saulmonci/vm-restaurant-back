@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\User;
+use App\Models\Role;
 
 class Company extends Model
 {
@@ -97,5 +99,23 @@ class Company extends Model
     public function menuItems()
     {
         return $this->hasMany(MenuItem::class);
+    }
+
+    /**
+     * Los roles disponibles en esta compañía.
+     */
+    public function roles()
+    {
+        return $this->hasMany(Role::class);
+    }
+
+    /**
+     * Los usuarios que tienen roles en esta compañía.
+     */
+    public function usersWithRoles()
+    {
+        return $this->belongsToMany(User::class, 'user_roles')
+            ->withPivot('role_id')
+            ->withTimestamps();
     }
 }

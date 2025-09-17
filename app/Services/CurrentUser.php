@@ -16,6 +16,8 @@ class CurrentUser
     private ?User $user = null;
     private ?int $userId = null;
     private ?array $preferences = null;
+    private ?array $roles = null;
+    private ?array $permissions = null;
     private bool $loaded = false;
 
     /**
@@ -137,30 +139,6 @@ class CurrentUser
     }
 
     /**
-     * Check if user has a specific role or permission
-     */
-    public function hasRole(string $role): bool
-    {
-        $user = $this->get();
-
-        if (!$user) {
-            return false;
-        }
-
-        // This can be expanded based on your role system
-        // For now, checking a simple 'role' attribute
-        return $user->role === $role;
-    }
-
-    /**
-     * Check if user is admin
-     */
-    public function isAdmin(): bool
-    {
-        return $this->hasRole('admin');
-    }
-
-    /**
      * Check if user is active
      */
     public function isActive(): bool
@@ -230,17 +208,135 @@ class CurrentUser
     }
 
     /**
+     * Get user roles in the current company
+     */
+    public function roles(): array
+    {
+        if (!$this->loaded) {
+            $this->initialize();
+        }
+
+        return $this->roles ?? [];
+    }
+
+    /**
+     * Get user permissions in the current company
+     */
+    public function permissions(): array
+    {
+        if (!$this->loaded) {
+            $this->initialize();
+        }
+
+        return $this->permissions ?? [];
+    }
+
+    /**
+     * Check if user has a specific role in the current company
+     */
+    public function hasRole(string $roleName): bool
+    {
+        return in_array($roleName, $this->roles());
+    }
+
+    /**
+     * Check if user has any of the specified roles in the current company
+     */
+    public function hasAnyRole(array $roleNames): bool
+    {
+        $userRoles = $this->roles();
+        return !empty(array_intersect($userRoles, $roleNames));
+    }
+
+    /**
+     * Check if user has all of the specified roles in the current company
+     */
+    public function hasAllRoles(array $roleNames): bool
+    {
+        $userRoles = $this->roles();
+        return empty(array_diff($roleNames, $userRoles));
+    }
+
+    /**
+     * Check if user has a specific permission in the current company
+     */
+    public function hasPermission(string $permissionName): bool
+    {
+        return in_array($permissionName, $this->permissions());
+    }
+
+    /**
+     * Check if user has any of the specified permissions in the current company
+     */
+    public function hasAnyPermission(array $permissionNames): bool
+    {
+        $userPermissions = $this->permissions();
+        return !empty(array_intersect($userPermissions, $permissionNames));
+    }
+
+    /**
+     * Check if user has all of the specified permissions in the current company
+     */
+    public function hasAllPermissions(array $permissionNames): bool
+    {
+        $userPermissions = $this->permissions();
+        return empty(array_diff($permissionNames, $userPermissions));
+    }
+
+    /**
+     * Check if user is admin in the current company
+     */
+    public function isAdmin(): bool
+    {
+        return $this->hasRole('admin');
+    }
+
+    /**
+     * Check if user is manager in the current company
+     */
+    public function isManager(): bool
+    {
+        return $this->hasRole('manager');
+    }
+
+    /**
+     * Check if user can manage users (has permission or is admin)
+     */
+    public function canManageUsers(): bool
+    {
+        return $this->hasPermission('manage_users') || $this->isAdmin();
+    }
+
+    /**
+     * Check if user can manage menu (has permission or is admin/manager)
+     */
+    public function canManageMenu(): bool
+    {
+        return $this->hasAnyPermission(['create_menu', 'edit_menu', 'delete_menu'])
+            || $this->hasAnyRole(['admin', 'manager']);
+    }
+
+    /**
      * Clear all cached data
      */
     public function clearCache(): void
     {
         if ($this->user) {
             Cache::forget("user.{$this->user->id}");
+
+            // Also clear roles and permissions cache
+            $currentCompany = app(\App\Services\CurrentCompany::class);
+            $company = $currentCompany->get();
+            if ($company) {
+                Cache::forget("user_roles_permissions.{$this->user->id}.{$company->id}");
+            }
         }
 
         $this->user = null;
         $this->userId = null;
         $this->preferences = null;
+        $this->roles = null;
+        $this->permissions = null;
         $this->loaded = false;
     }
 
@@ -255,6 +351,9 @@ class CurrentUser
 
     // =================== Private Methods ===================
 
+    /**
+     * Load user data from database with caching
+     */
     private function loadUserData(): void
     {
         if (!$this->userId) {
@@ -270,6 +369,49 @@ class CurrentUser
 
         if ($this->user) {
             $this->preferences = $this->user->preferences ?? [];
+            $this->loadRolesAndPermissions();
         }
+    }
+
+    /**
+     * Load user roles and permissions for the current company
+     */
+    private function loadRolesAndPermissions(): void
+    {
+        if (!$this->user) {
+            return;
+        }
+
+        $currentCompany = app(\App\Services\CurrentCompany::class);
+        $company = $currentCompany->get();
+
+        if (!$company) {
+            $this->roles = [];
+            $this->permissions = [];
+            return;
+        }
+
+        $cacheKey = "user_roles_permissions.{$this->userId}.{$company->id}";
+
+        $rolesAndPermissions = Cache::remember($cacheKey, 1800, function () use ($company) {
+            // Get user roles for the current company
+            $roles = $this->user->roles()
+                ->wherePivot('company_id', $company->id)
+                ->with('permissions')
+                ->get();
+
+            $roleNames = $roles->pluck('name')->toArray();
+            $permissions = $roles->flatMap(function ($role) {
+                return $role->permissions->pluck('name');
+            })->unique()->values()->toArray();
+
+            return [
+                'roles' => $roleNames,
+                'permissions' => $permissions
+            ];
+        });
+
+        $this->roles = $rolesAndPermissions['roles'];
+        $this->permissions = $rolesAndPermissions['permissions'];
     }
 }

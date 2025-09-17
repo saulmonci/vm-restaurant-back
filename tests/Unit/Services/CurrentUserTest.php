@@ -5,6 +5,8 @@ namespace Tests\Unit\Services;
 use Tests\TestCase;
 use App\Models\User;
 use App\Models\Company;
+use App\Models\Role;
+use App\Models\Permission;
 use App\Services\CurrentUser;
 use App\Facades\CurrentUser as CurrentUserFacade;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -249,5 +251,236 @@ class CurrentUserTest extends TestCase
         $this->assertCount(2, $companies);
         $this->assertTrue($companies->contains('name', 'Company 1'));
         $this->assertTrue($companies->contains('name', 'Company 2'));
+    }
+
+    // =================== ROLES AND PERMISSIONS TESTS ===================
+
+    public function test_roles_returns_user_roles_in_current_company()
+    {
+        // Create a company and set it as current
+        $company = Company::factory()->create(['name' => 'Test Company']);
+        $this->mockCurrentCompany($company);
+
+        // Create roles
+        $adminRole = Role::factory()->create(['name' => 'admin']);
+        $managerRole = Role::factory()->create(['name' => 'manager']);
+
+        // Assign roles to user in this company
+        $this->user->roles()->attach($adminRole->id, ['company_id' => $company->id]);
+        $this->user->roles()->attach($managerRole->id, ['company_id' => $company->id]);
+
+        Auth::login($this->user);
+        $this->currentUserService->initialize();
+
+        $roles = $this->currentUserService->roles();
+
+        $this->assertIsArray($roles);
+        $this->assertContains('admin', $roles);
+        $this->assertContains('manager', $roles);
+        $this->assertCount(2, $roles);
+    }
+
+    public function test_permissions_returns_user_permissions_in_current_company()
+    {
+        // Create a company and set it as current
+        $company = Company::factory()->create(['name' => 'Test Company']);
+        $this->mockCurrentCompany($company);
+
+        // Create permissions
+        $manageUsersPermission = Permission::factory()->create(['name' => 'manage_users']);
+        $createMenuPermission = Permission::factory()->create(['name' => 'create_menu']);
+
+        // Create role with permissions
+        $adminRole = Role::factory()->create(['name' => 'admin']);
+        $adminRole->permissions()->attach([$manageUsersPermission->id, $createMenuPermission->id]);
+
+        // Assign role to user in this company
+        $this->user->roles()->attach($adminRole->id, ['company_id' => $company->id]);
+
+        Auth::login($this->user);
+        $this->currentUserService->initialize();
+
+        $permissions = $this->currentUserService->permissions();
+
+        $this->assertIsArray($permissions);
+        $this->assertContains('manage_users', $permissions);
+        $this->assertContains('create_menu', $permissions);
+        $this->assertCount(2, $permissions);
+    }
+
+    public function test_has_role_checks_specific_role()
+    {
+        // Create a company and set it as current
+        $company = Company::factory()->create(['name' => 'Test Company']);
+        $this->mockCurrentCompany($company);
+
+        // Create and assign admin role
+        $adminRole = Role::factory()->create(['name' => 'admin']);
+        $this->user->roles()->attach($adminRole->id, ['company_id' => $company->id]);
+
+        Auth::login($this->user);
+        $this->currentUserService->initialize();
+
+        $this->assertTrue($this->currentUserService->hasRole('admin'));
+        $this->assertFalse($this->currentUserService->hasRole('manager'));
+    }
+
+    public function test_has_any_role_checks_multiple_roles()
+    {
+        // Create a company and set it as current
+        $company = Company::factory()->create(['name' => 'Test Company']);
+        $this->mockCurrentCompany($company);
+
+        // Create and assign manager role
+        $managerRole = Role::factory()->create(['name' => 'manager']);
+        $this->user->roles()->attach($managerRole->id, ['company_id' => $company->id]);
+
+        Auth::login($this->user);
+        $this->currentUserService->initialize();
+
+        $this->assertTrue($this->currentUserService->hasAnyRole(['admin', 'manager']));
+        $this->assertFalse($this->currentUserService->hasAnyRole(['admin', 'employee']));
+    }
+
+    public function test_has_all_roles_checks_all_required_roles()
+    {
+        // Create a company and set it as current
+        $company = Company::factory()->create(['name' => 'Test Company']);
+        $this->mockCurrentCompany($company);
+
+        // Create and assign multiple roles
+        $adminRole = Role::factory()->create(['name' => 'admin']);
+        $managerRole = Role::factory()->create(['name' => 'manager']);
+        $this->user->roles()->attach([$adminRole->id, $managerRole->id], ['company_id' => $company->id]);
+
+        Auth::login($this->user);
+        $this->currentUserService->initialize();
+
+        $this->assertTrue($this->currentUserService->hasAllRoles(['admin', 'manager']));
+        $this->assertFalse($this->currentUserService->hasAllRoles(['admin', 'manager', 'employee']));
+    }
+
+    public function test_has_permission_checks_specific_permission()
+    {
+        // Create a company and set it as current
+        $company = Company::factory()->create(['name' => 'Test Company']);
+        $this->mockCurrentCompany($company);
+
+        // Create permission and role
+        $manageUsersPermission = Permission::factory()->create(['name' => 'manage_users']);
+        $adminRole = Role::factory()->create(['name' => 'admin']);
+        $adminRole->permissions()->attach($manageUsersPermission->id);
+
+        // Assign role to user
+        $this->user->roles()->attach($adminRole->id, ['company_id' => $company->id]);
+
+        Auth::login($this->user);
+        $this->currentUserService->initialize();
+
+        $this->assertTrue($this->currentUserService->hasPermission('manage_users'));
+        $this->assertFalse($this->currentUserService->hasPermission('delete_users'));
+    }
+
+    public function test_is_admin_checks_admin_role()
+    {
+        // Create a company and set it as current
+        $company = Company::factory()->create(['name' => 'Test Company']);
+        $this->mockCurrentCompany($company);
+
+        // Create and assign admin role
+        $adminRole = Role::factory()->create(['name' => 'admin']);
+        $this->user->roles()->attach($adminRole->id, ['company_id' => $company->id]);
+
+        Auth::login($this->user);
+        $this->currentUserService->initialize();
+
+        $this->assertTrue($this->currentUserService->isAdmin());
+    }
+
+    public function test_is_manager_checks_manager_role()
+    {
+        // Create a company and set it as current
+        $company = Company::factory()->create(['name' => 'Test Company']);
+        $this->mockCurrentCompany($company);
+
+        // Create and assign manager role
+        $managerRole = Role::factory()->create(['name' => 'manager']);
+        $this->user->roles()->attach($managerRole->id, ['company_id' => $company->id]);
+
+        Auth::login($this->user);
+        $this->currentUserService->initialize();
+
+        $this->assertTrue($this->currentUserService->isManager());
+        $this->assertFalse($this->currentUserService->isAdmin());
+    }
+
+    public function test_can_manage_users_checks_permission_or_admin_role()
+    {
+        // Create a company and set it as current
+        $company = Company::factory()->create(['name' => 'Test Company']);
+        $this->mockCurrentCompany($company);
+
+        // Test with admin role
+        $adminRole = Role::factory()->create(['name' => 'admin']);
+        $this->user->roles()->attach($adminRole->id, ['company_id' => $company->id]);
+
+        Auth::login($this->user);
+        $this->currentUserService->initialize();
+
+        $this->assertTrue($this->currentUserService->canManageUsers());
+    }
+
+    public function test_roles_empty_when_no_current_company()
+    {
+        // Mock no current company
+        $this->mockCurrentCompany(null);
+
+        Auth::login($this->user);
+        $this->currentUserService->initialize();
+
+        $this->assertEmpty($this->currentUserService->roles());
+        $this->assertEmpty($this->currentUserService->permissions());
+        $this->assertFalse($this->currentUserService->hasRole('admin'));
+        $this->assertFalse($this->currentUserService->hasPermission('manage_users'));
+    }
+
+    public function test_clear_cache_clears_roles_and_permissions()
+    {
+        // Create a company and set it as current
+        $company = Company::factory()->create(['name' => 'Test Company']);
+        $this->mockCurrentCompany($company);
+
+        // Create and assign role
+        $adminRole = Role::factory()->create(['name' => 'admin']);
+        $this->user->roles()->attach($adminRole->id, ['company_id' => $company->id]);
+
+        Auth::login($this->user);
+        $this->currentUserService->initialize();
+
+        // Verify roles are loaded
+        $this->assertNotEmpty($this->currentUserService->roles());
+
+        // Clear cache
+        $this->currentUserService->clearCache();
+
+        // After clearing cache, the service should need to reinitialize
+        // Since the user is still logged in, get() will reinitialize and return the user
+        $user = $this->currentUserService->get();
+        $this->assertNotNull($user);
+
+        // But the roles should be reloaded from database/cache
+        $roles = $this->currentUserService->roles();
+        $this->assertContains('admin', $roles);
+    }
+
+    /**
+     * Mock the CurrentCompany service
+     */
+    private function mockCurrentCompany(?Company $company)
+    {
+        $currentCompanyMock = $this->createMock(\App\Services\CurrentCompany::class);
+        $currentCompanyMock->method('get')->willReturn($company);
+
+        $this->app->instance(\App\Services\CurrentCompany::class, $currentCompanyMock);
     }
 }
