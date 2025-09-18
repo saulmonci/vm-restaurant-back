@@ -91,19 +91,41 @@ class CurrentCompany
      */
     public function switchTo(int $companyId): bool
     {
-        if (!$this->userHasAccessToCompany(Auth::user(), $companyId)) {
+        $user = Auth::user();
+
+        // Verify user has access to this company
+        if (!$user->companies()->where('companies.id', $companyId)->exists()) {
             return false;
         }
 
         // Clear current cache
         $this->clearCache();
 
-        // Set new company
+        // Set new company in both session and cache
+        $cacheKey = "user_current_company.{$user->id}";
+
         session(['current_company_id' => $companyId]);
+        Cache::put($cacheKey, $companyId, now()->addDays(30));
+
         $this->companyId = $companyId;
         $this->loadCompanyData();
 
         return true;
+    }
+
+    /**
+     * Switch to different company by slug (for development/frontend usage)
+     */
+    public function switchToBySlug(string $slug): bool
+    {
+        // Find company by slug
+        $company = Company::where('slug', $slug)->first();
+
+        if (!$company) {
+            return false;
+        }
+
+        return $this->switchTo($company->id);
     }
 
     /**
@@ -179,25 +201,44 @@ class CurrentCompany
         $user = Auth::user();
 
         // Priority 1: User's direct company_id
-        if (isset($user->company_id)) {
+        if (isset($user->company_id) && $user->company_id) {
             return $user->company_id;
         }
 
-        // Priority 2: Session-stored company (for multi-company users)
+        // Priority 2: Cache-stored company (for multi-company users)
+        $cacheKey = "user_current_company.{$user->id}";
+        if (Cache::has($cacheKey)) {
+            $cachedCompanyId = Cache::get($cacheKey);
+
+            // Verify user still has access to this company
+            if ($user->companies()->where('companies.id', $cachedCompanyId)->exists()) {
+                return $cachedCompanyId;
+            } else {
+                // Clean invalid cache
+                Cache::forget($cacheKey);
+            }
+        }
+
+        // Priority 3: Session-stored company (fallback for web)
         if (session()->has('current_company_id')) {
             $sessionCompanyId = session('current_company_id');
 
-            if ($this->userHasAccessToCompany($user, $sessionCompanyId)) {
+            // Verify user has access
+            if ($user->companies()->where('companies.id', $sessionCompanyId)->exists()) {
+                // Also cache it for future API requests
+                Cache::put($cacheKey, $sessionCompanyId, now()->addDays(30));
                 return $sessionCompanyId;
             }
         }
 
-        // Priority 3: First company the user belongs to
-        if ($user->companies()->exists()) {
-            $firstCompany = $user->companies()->first();
+        // Priority 4: First company the user belongs to (automatic fallback)
+        $userCompanies = $user->companies;
+        if ($userCompanies->count() > 0) {
+            $firstCompany = $userCompanies->first();
 
-            // Store in session for future requests
+            // Store in both session and cache for future requests
             session(['current_company_id' => $firstCompany->id]);
+            Cache::put($cacheKey, $firstCompany->id, now()->addDays(30));
 
             return $firstCompany->id;
         }

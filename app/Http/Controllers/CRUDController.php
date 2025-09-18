@@ -1,13 +1,11 @@
-﻿<?php
+<?php
 
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use App\Repositories\BaseRepositoryInterface;
-use App\Http\Resources\BaseResource;
 
-abstract class CRUDController extends Controller
+class CRUDController extends Controller
 {
     protected $repository;
     protected $resourceClass;

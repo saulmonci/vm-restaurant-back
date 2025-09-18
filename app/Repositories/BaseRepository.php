@@ -5,6 +5,8 @@ namespace App\Repositories;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use App\Facades\CurrentCompany;
 
 abstract class BaseRepository implements BaseRepositoryInterface
@@ -204,11 +206,51 @@ abstract class BaseRepository implements BaseRepositoryInterface
         $table = $this->model->getTable();
         $hasCompanyId = Schema::hasColumn($table, 'company_id');
 
-        if ($hasCompanyId && CurrentCompany::exists()) {
-            $query->where('company_id', CurrentCompany::id());
+        if ($hasCompanyId) {
+            $companyId = $this->getCurrentCompanyId();
+
+            if ($companyId) {
+                $query->where('company_id', $companyId);
+            }
         }
 
         return $query;
+    }
+
+    /**
+     * Get current company ID from cache or session (bypass CurrentCompany service)
+     */
+    protected function getCurrentCompanyId(): ?int
+    {
+        if (!Auth::check()) {
+            return null;
+        }
+
+        $user = Auth::user();
+
+        // Try cache first (for API requests)
+        $cacheKey = "user_current_company.{$user->id}";
+        if (Cache::has($cacheKey)) {
+            return Cache::get($cacheKey);
+        }
+
+        // Try session (for web requests)  
+        if (session()->has('current_company_id')) {
+            return session('current_company_id');
+        }
+
+        // Fallback: get first company the user belongs to
+        $userCompanies = $user->companies;
+        if ($userCompanies->count() > 0) {
+            $firstCompanyId = $userCompanies->first()->id;
+
+            // Cache it for future requests
+            Cache::put($cacheKey, $firstCompanyId, now()->addDays(30));
+
+            return $firstCompanyId;
+        }
+
+        return null;
     }
     /**
      * Apply specific filters for each repository.

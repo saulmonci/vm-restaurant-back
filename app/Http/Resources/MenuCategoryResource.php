@@ -17,7 +17,42 @@ class MenuCategoryResource extends BaseResource
             'description' => $item->description,
             'is_active' => $item->is_active ?? true,
             'sort_order' => $item->sort_order ?? 0,
+            'image_url' => $item->image_url,
+
+            // Información jerárquica
+            'parent_id' => $item->parent_id,
+            'is_main_category' => $item->isMain(),
+            'is_subcategory' => $item->isSubcategory(),
+            'level' => $item->getLevel(),
+            'full_path' => $item->getFullPath(),
         ];
+
+        // Formatear categoría padre si está cargada
+        if ($item->relationLoaded('parent') && $item->parent) {
+            $formatted['parent'] = [
+                'id' => $item->parent->id,
+                'name' => $item->parent->name,
+                'is_active' => $item->parent->is_active ?? true,
+            ];
+        }
+
+        // Formatear subcategorías si están cargadas
+        if ($item->relationLoaded('children')) {
+            $children = $item->children;
+
+            $formatted['children'] = $options['include_children'] ?? true
+                ? static::collection($children)
+                : null;
+
+            $formatted['children_count'] = $children->count();
+            $formatted['active_children_count'] = $children->where('is_active', true)->count();
+            $formatted['has_children'] = $children->count() > 0;
+        }
+
+        // Formatear subcategorías activas si se solicita
+        if ($item->relationLoaded('activeChildren')) {
+            $formatted['active_children'] = static::collection($item->activeChildren);
+        }
 
         // Formatear empresa si está cargada
         if ($item->relationLoaded('company') && $item->company) {
@@ -48,6 +83,13 @@ class MenuCategoryResource extends BaseResource
         } else {
             $formatted['menu_items'] = null;
             $formatted['menu_items_count'] = null;
+        }
+
+        // Información de items incluyendo subcategorías si se solicita
+        if ($options['include_all_items'] ?? false) {
+            $allItemsCount = $this->getAllItemsCount($item);
+            $formatted['total_items_count'] = $allItemsCount['total'];
+            $formatted['total_available_items_count'] = $allItemsCount['available'];
         }
 
         // Estado de disponibilidad de la categoría
@@ -221,5 +263,51 @@ class MenuCategoryResource extends BaseResource
     {
         // Aquí podrías implementar lógica real basada en órdenes, views, etc.
         return rand(1, 100);
+    }
+
+    /**
+     * Obtener conteo total de items incluyendo subcategorías
+     */
+    protected function getAllItemsCount($category): array
+    {
+        $totalCount = 0;
+        $availableCount = 0;
+
+        // Contar items de la categoría actual
+        if ($category->relationLoaded('menuItems')) {
+            $menuItems = $category->menuItems;
+            $totalCount += $menuItems->count();
+            $availableCount += $menuItems->where('is_available', true)->count();
+        }
+
+        // Contar items de subcategorías recursivamente
+        if ($category->relationLoaded('children')) {
+            foreach ($category->children as $child) {
+                $childCounts = $this->getAllItemsCount($child);
+                $totalCount += $childCounts['total'];
+                $availableCount += $childCounts['available'];
+            }
+        }
+
+        return [
+            'total' => $totalCount,
+            'available' => $availableCount,
+        ];
+    }
+
+    /**
+     * Formatear árbol jerárquico completo
+     */
+    public static function hierarchicalTree($categories, array $options = []): array
+    {
+        return $categories->map(function ($category) use ($options) {
+            $formatted = (new static($category))->formatter($category, request(), $options);
+
+            if ($category->relationLoaded('children') && $category->children->isNotEmpty()) {
+                $formatted['children'] = static::hierarchicalTree($category->children, $options);
+            }
+
+            return $formatted;
+        })->toArray();
     }
 }
